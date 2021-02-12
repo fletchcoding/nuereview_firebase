@@ -79,6 +79,41 @@ exports.findAPlace = functions.runWith(runtimeOpts).https.onCall((data) => {
     });
 });
 
+exports.createPlace = functions.firestore
+  .document("places/{place_id}")
+  .onCreate((snap) => {
+    const addressComponents = snap.data().address_components;
+    let streetNo, streetName, suburb, state, postcode;
+    for (const comp of addressComponents) {
+      switch(comp.types[0]) {
+        case "street_number":
+          streetNo = comp.long_name;
+          break;
+        case "route":
+          streetName = comp.long_name;
+          break;
+        case "locality":
+          suburb = comp.long_name;
+          break;
+        case "administrative_area_level_1":
+          state = comp.short_name;
+          break;
+        case "postal_code":
+          postcode = comp.long_name;
+      }
+    }
+    var address = {
+      street: streetNo + " " + streetName,
+      suburb: suburb,
+      state: state,
+      postcode: postcode,
+    };
+    snap.ref.update({
+      address: address,
+      address_components: admin.firestore.FieldValue.delete()
+    });
+
+  });
 
 
 /**
