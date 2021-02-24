@@ -53,7 +53,7 @@ const runtimeOpts = {
 ////////////////////////////////////////////////////////////////////////////////
 exports.findAPlace = functions.runWith(runtimeOpts).https.onCall((data) => {
   //Get a place id from google's place search api
-  const placeQuery = data.placequery.split(" ").join("%20");
+  const placeQuery = String(data.placequery).split(" ").join("%20");
   return fetch("https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=" +
     placeQuery + "&inputtype=textquery&fields=place_id&key=" + functions.config().places_api.key)
     .then(res => res.json())
@@ -65,7 +65,7 @@ exports.findAPlace = functions.runWith(runtimeOpts).https.onCall((data) => {
         .then((docSnapshot) => {
           if(!docSnapshot.exists) {
             //If not found, pull data from google's place details api
-            fetch("https://maps.googleapis.com/maps/api/place/details/json?place_id=" +
+            return fetch("https://maps.googleapis.com/maps/api/place/details/json?place_id=" +
               place_id + "&fields=name,address_component&key=" + functions.config().places_api.key)
               .then(res => res.json())
               .then(json => {
@@ -114,6 +114,35 @@ exports.createPlace = functions.firestore
     });
 
   });
+
+exports.createNewReview = functions.runWith(runtimeOpts).https.onCall((data) => {
+  const newReview = data.review;
+  newReview.visitDate = new Date(newReview.visitDate);
+  const reviewId = data.docId;
+  const placeId = data.placeId;
+  console.log(reviewId);
+  console.log(placeId);
+  //Check if user has previous review of this place;
+  const reviewsRef = admin.firestore()
+    .collection("places")
+    .doc(placeId)
+    .collection("reviews");
+
+  const snapshot = reviewsRef.where("userId", "==", newReview.userId);
+  if (snapshot.empty) {
+    //If new review, simply save
+    console.log("No previous reviews");
+  } else {
+    //If old review exists, move it to old_reviews, and save current.
+    const oldRef = admin.firestore()
+      .collection("places")
+      .doc(placeId)
+      .collection("oldReviews");
+
+    console.log(snapshot);
+  }
+  reviewsRef.doc(reviewId).set(newReview).then(() => {return {response:"OK"};});
+});
 
 
 /**
